@@ -183,6 +183,7 @@ const AddPartScreen = ({ navigation }) => {
                     <Text style={[styles.photoActionText, { color: COLORS.error }]}>QUITAR</Text>
                   </TouchableOpacity>
                 </View>
+                {errors.precio && <Text style={styles.errorText}>{errors.precio}</Text>}
               </View>
             ) : (
               <TouchableOpacity style={styles.photoPlaceholder} onPress={pickImage}>
@@ -383,6 +384,15 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     gap: SPACING.lg,
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    fontSize: 11,
+    color: COLORS.error,
+    marginTop: 4,
   },
   actionContainer: {
     gap: SPACING.md,
