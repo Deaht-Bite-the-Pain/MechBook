@@ -1,0 +1,68 @@
+export const COLORS = {
+  background: '#131314',
+  surface: '#131314',
+  surfaceContainer: '#1f1f20',
+  surfaceContainerLow: '#1b1b1c',
+  surfaceContainerHigh: '#2a2a2b',
+  surfaceContainerHighest: '#353436',
+  surfaceContainerLowest: '#0e0e0f',
+  primary: '#ffb77d',
+  primaryContainer: '#ff8c00',
+  onPrimary: '#4d2600',
+  onPrimaryFixed: '#2f1500',
+  secondary: '#bcc8ce',
+  onSurface: '#e5e2e3',
+  onSurfaceVariant: '#ddc1ae',
+  outlineVariant: '#564334',
+  errorContainer: '#93000a',
+  error: '#ffb4ab',
+  onError: '#690005',
+  onErrorContainer: '#ffdad6',
+  tertiary: '#85cfff',
+  onTertiary: '#00344c',
+  muted: '#9ca3af',
+  // Transparent variants
+  borderOverlay: 'rgba(86, 67, 52, 0.1)',
+  borderOverlayMedium: 'rgba(86, 67, 52, 0.15)',
+  borderOverlayHigh: 'rgba(86, 67, 52, 0.2)',
+  primaryOverlayLight: 'rgba(255, 183, 125, 0.1)',
+  primaryOverlay: 'rgba(255, 183, 125, 0.2)',
+  primaryOverlayMedium: 'rgba(255, 183, 125, 0.3)',
+  errorOverlay: 'rgba(147, 0, 10, 0.2)',
+  onSurfaceVariantOverlayText: 'rgba(229, 226, 227, 0.6)',
+  onSurfaceVariantOverlayPlaceholder: 'rgba(221, 193, 174, 0.3)',
+  onSurfaceVariantOverlayPlaceholderMedium: 'rgba(221, 193, 174, 0.4)',
+  surfaceCancelButton: 'rgba(53, 52, 54, 0.5)',
+  surfaceCancelBorder: 'rgba(164, 140, 122, 0.2)',
+  backdropLayer: 'rgba(0, 0, 0, 0.8)',
+  containerOverlay: 'rgba(0, 0, 0, 0.6)',
+  modalHandle: 'rgba(164, 140, 122, 0.2)',
+  modalBorder: 'rgba(164, 140, 122, 0.1)',
+  infoOverlay: 'rgba(0, 181, 252, 0.4)',
+};
+
+export const SPACING = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+};
+
+export const FONT_SIZES = {
+  xs: 10,
+  sm: 12,
+  md: 14,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  display: 32,
+};
+
+export const RADIUS = {
+  sm: 4,
+  md: 8,
+  lg: 12,
+  xl: 24,
+};

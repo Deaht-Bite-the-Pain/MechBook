@@ -1,242 +1,272 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
   Image,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
+  Alert,
+  BackHandler,
 } from 'react-native';
-
-const { width } = Dimensions.get('window');
 import { MaterialIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
 
-const COLORS = {
-  background: '#131314',
-  surface: '#131314',
-  surfaceContainer: '#1f1f20',
-  surfaceContainerLow: '#1b1b1c',
-  surfaceContainerHigh: '#2a2a2b',
-  surfaceContainerHighest: '#353436',
-  surfaceContainerLowest: '#0e0e0f',
-  primary: '#ffb77d',
-  primaryContainer: '#ff8c00',
-  onPrimary: '#4d2600',
-  onPrimaryFixed: '#2f1500',
-  secondary: '#bcc8ce',
-  onSurface: '#e5e2e3',
-  onSurfaceVariant: '#ddc1ae',
-  outlineVariant: '#564334',
-  errorContainer: '#93000a',
-  error: '#ffb4ab',
-  onTertiary: '#00344c',
-  tertiary: '#85cfff',
-  primaryFixedDim: '#ffb77d',
+import FormField from '../components/FormField';
+import partStorage from '../storage/partStorage';
+import { validatePartForm } from '../utils/validation';
+import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../constants/theme';
+
+const INITIAL_FORM = {
+  pieza: '',
+  marca: '',
+  noSerie: '',
+  precio: '',
+  fechaCambio: '',
+  foto: null,
 };
 
 const AddPartScreen = ({ navigation }) => {
-  const [formData, setFormData] = useState({
-    pieza: '',
-    marca: '',
-    noSerie: '',
-    precio: '',
-    fecha: '',
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const updateField = useCallback((field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
+  }, []);
+
+  const pickImage = useCallback(async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso requerido',
+          'Necesitamos acceso a tus fotos para seleccionar una imagen.'
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        updateField('foto', result.assets[0].uri);
+      }
+    } catch (e) {
+      console.error('Error al seleccionar imagen:', e);
+      Alert.alert('Error', 'No se pudo seleccionar la imagen.');
+    }
+  }, [updateField]);
+
+  const removeImage = useCallback(() => {
+    updateField('foto', null);
+  }, [updateField]);
+
+  const validate = useCallback(() => {
+    const currentErrors = validatePartForm(formData);
+    setErrors(currentErrors);
+    return Object.keys(currentErrors).length === 0;
+  }, [formData]);
+
+  const hasChanges = Object.values(formData).some((val) => val !== '' && val !== null);
+
+  const handleBack = useCallback(() => {
+    if (hasChanges && !saving) {
+      Alert.alert(
+        'Descartar cambios',
+        '¿Seguro que deseas salir? Se perderán los datos que no hayas guardado.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Salir sin guardar', style: 'destructive', onPress: () => navigation.goBack() },
+        ]
+      );
+      return true;
+    }
+    navigation.goBack();
+    return true;
+  }, [hasChanges, saving, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => handleBack();
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [handleBack])
+  );
+
+  const handleSave = useCallback(async () => {
+    if (saving) return;
+    if (!validate()) {
+      Alert.alert('Campos incompletos', 'Por favor corrige los errores antes de guardar.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const newPart = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2),
+        pieza:       formData.pieza.trim(),
+        marca:       formData.marca.trim(),
+        noSerie:     formData.noSerie.trim(),
+        precio:      parseFloat(formData.precio),
+        fechaCambio: formData.fechaCambio.trim(),
+        foto:        formData.foto,
+      };
+      const ok = await partStorage.savePart(newPart);
+      if (ok) {
+        navigation.goBack();
+      } else {
+        Alert.alert('Error', 'No se pudo guardar la pieza.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [formData, saving, validate, navigation]);
+
+  const handleCancel = useCallback(() => {
+    handleBack();
+  }, [handleBack]);
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.surfaceContainerLow} />
-      
+
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
+          <MaterialIcons name="arrow-back" size={24} color={COLORS.primary} />
+        </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <MaterialIcons name="settings-input-component" size={24} color={COLORS.primary} />
-          <Text style={styles.headerTitle}>TECHNICAL INVENTORY</Text>
+          <MaterialIcons name="settings-input-component" size={20} color={COLORS.primary} />
+          <Text style={styles.headerTitle}>NUEVA PIEZA</Text>
         </View>
-        <View style={styles.headerActions}>
-          <MaterialIcons name="search" size={24} color="#9ca3af" />
-          <MaterialIcons name="notifications-none" size={24} color="#9ca3af" />
-        </View>
+        <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Header Section */}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.titleSection}>
-            <Text style={styles.subtitle}>MÓDULO DE ADQUISICIÓN</Text>
+            <Text style={styles.subtitle}>MÓDULO DE REGISTRO</Text>
             <Text style={styles.title}>Registro de piezas</Text>
           </View>
 
-          {/* Bento-style Grid (Simple vertical for mobile) */}
-          <View style={styles.formContainer}>
-            {/* Technical Visual Card */}
-            <View style={styles.visualCard}>
-              <Image 
-                source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCJ-x3rIRCNvE9y1dgF5ZYE-2A-8RUgFmmiWUeMAnqVlqv4Hug61CUIKzQUgITkHCZxPk5Tm08tRWNv06A--LbmCKAx_ZA-r1VtLCzpqJ-9B5yCKFXEeGgnQ3FqzKprYDg_7rOgd_2A5W1d3f0JYXDlgYcnocC6uN6BXpY8EIXUH6uy6nfGvoYwCR8fzxTDRyeof8fnSb5T6tKiXF8Ch_3dRx67syp7XMBCi2M9GzGg-0kedPYT6ELlg8N0IG7GWEgpiJ3pvqLHh__-' }}
-                style={styles.visualImage}
-                resizeMode="cover"
-              />
-              <View style={styles.visualOverlay}>
-                <Text style={styles.visualStatus}>STATUS: ENGINEERING MODE</Text>
-                <Text style={styles.visualDescription}>
-                  Asegúrese de validar el número de serie OEM antes de confirmar el registro.
+          {/* Selector de imagen (opcional) */}
+          <View style={styles.photoCard}>
+            <Text style={styles.photoLabel}>FOTO (OPCIONAL)</Text>
+            {formData.foto ? (
+              <View style={styles.photoPreviewContainer}>
+                <Image source={{ uri: formData.foto }} style={styles.photoPreview} />
+                <View style={styles.photoActions}>
+                  <TouchableOpacity style={styles.photoActionBtn} onPress={pickImage}>
+                    <MaterialIcons name="edit" size={18} color={COLORS.onPrimaryFixed} />
+                    <Text style={styles.photoActionText}>CAMBIAR</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.photoActionBtn, styles.photoRemoveBtn]}
+                    onPress={removeImage}
+                  >
+                    <MaterialIcons name="delete" size={18} color={COLORS.error} />
+                    <Text style={[styles.photoActionText, { color: COLORS.error }]}>QUITAR</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.photoPlaceholder} onPress={pickImage}>
+                <MaterialIcons name="add-a-photo" size={40} color={COLORS.primary} />
+                <Text style={styles.photoPlaceholderText}>Seleccionar imagen</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Formulario */}
+          <View style={styles.formContent}>
+            <FormField
+              label="PIEZA"
+              placeholder="ej. Bujía de Iridio"
+              value={formData.pieza}
+              onChangeText={(t) => updateField('pieza', t)}
+              error={errors.pieza}
+              iconName="precision-manufacturing"
+              maxLength={80}
+            />
+            <FormField
+              label="MARCA"
+              placeholder="ej. Bosch"
+              value={formData.marca}
+              onChangeText={(t) => updateField('marca', t)}
+              error={errors.marca}
+              maxLength={60}
+            />
+            <FormField
+              label="NO. SERIE"
+              placeholder="Número de serie alfanumérico"
+              value={formData.noSerie}
+              onChangeText={(t) => updateField('noSerie', t)}
+              error={errors.noSerie}
+              maxLength={60}
+              autoCapitalize="characters"
+            />
+            <FormField
+              label="PRECIO (USD)"
+              placeholder="0.00"
+              value={formData.precio}
+              onChangeText={(t) => updateField('precio', t)}
+              error={errors.precio}
+              keyboardType="numeric"
+              prefix="$"
+              maxLength={12}
+            />
+            <FormField
+              label="FECHA DE CAMBIO"
+              placeholder="YYYY-MM-DD"
+              value={formData.fechaCambio}
+              onChangeText={(t) => updateField('fechaCambio', t)}
+              error={errors.fechaCambio}
+              iconName="calendar-today"
+              maxLength={10}
+              autoCapitalize="none"
+            />
+
+            {/* Botones */}
+            <View style={styles.actionContainer}>
+              <TouchableOpacity
+                style={[styles.saveButton, saving && { opacity: 0.6 }]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {saving ? 'GUARDANDO...' : 'GUARDAR'}
                 </Text>
-              </View>
-            </View>
-
-            {/* Specs System Card */}
-            <View style={styles.specsCard}>
-              <View style={styles.specsHeader}>
-                <MaterialIcons name="terminal" size={14} color={COLORS.primary} />
-                <Text style={styles.specsTitle}>SPECS SYSTEM</Text>
-              </View>
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>ENCRYPTED ID</Text>
-                <Text style={styles.specValue}>SYS-992-PX</Text>
-              </View>
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>PRIORITY</Text>
-                <Text style={[styles.specValue, { color: COLORS.tertiary }]}>Critical</Text>
-              </View>
-            </View>
-
-            {/* Form Fields */}
-            <View style={styles.formContent}>
-              {/* Pieza */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PIEZA</Text>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="ej. Bujía de Iridio"
-                    placeholderTextColor="rgba(221, 193, 174, 0.3)"
-                    value={formData.pieza}
-                    onChangeText={(text) => setFormData({...formData, pieza: text})}
-                  />
-                  <MaterialIcons name="precision-manufacturing" size={20} color={COLORS.primary} style={styles.inputIcon} />
-                </View>
-              </View>
-
-              {/* Marca */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>MARCA</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="ej. Bosch"
-                  placeholderTextColor="rgba(221, 193, 174, 0.3)"
-                  value={formData.marca}
-                  onChangeText={(text) => setFormData({...formData, marca: text})}
-                />
-              </View>
-
-              {/* No. Serie */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>NO. SERIE</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Número de serie alfanumérico"
-                  placeholderTextColor="rgba(221, 193, 174, 0.3)"
-                  value={formData.noSerie}
-                  onChangeText={(text) => setFormData({...formData, noSerie: text})}
-                />
-              </View>
-
-              {/* Precio */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PRECIO (USD)</Text>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.currencyPrefix}>$</Text>
-                  <TextInput
-                    style={[styles.input, { paddingLeft: 30 }]}
-                    placeholder="0.00"
-                    placeholderTextColor="rgba(221, 193, 174, 0.3)"
-                    keyboardType="numeric"
-                    value={formData.precio}
-                    onChangeText={(text) => setFormData({...formData, precio: text})}
-                  />
-                </View>
-              </View>
-
-              {/* Fecha de Cambio */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>FECHA DE CAMBIO</Text>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="rgba(221, 193, 174, 0.3)"
-                    value={formData.fecha}
-                    onChangeText={(text) => setFormData({...formData, fecha: text})}
-                  />
-                  <MaterialIcons name="calendar-today" size={18} color="rgba(221, 193, 174, 0.4)" style={styles.inputIcon} />
-                </View>
-              </View>
-
-              {/* CTA Actions */}
-              <View style={styles.actionContainer}>
-                <TouchableOpacity style={styles.saveButton}>
-                  <Text style={styles.saveButtonText}>GUARDAR</Text>
-                  <MaterialIcons name="check-circle" size={16} color={COLORS.onPrimaryFixed} />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.cancelButton}
-                  onPress={() => navigation?.goBack()}
-                >
-                  <Text style={styles.cancelButtonText}>CANCELAR</Text>
-                  <MaterialIcons name="close" size={16} color={COLORS.onSurface} />
-                </TouchableOpacity>
-              </View>
+                <MaterialIcons name="check-circle" size={16} color={COLORS.onPrimaryFixed} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+                disabled={saving}
+              >
+                <Text style={styles.cancelButtonText}>CANCELAR</Text>
+                <MaterialIcons name="close" size={16} color={COLORS.onSurface} />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Technical Metadata Footer */}
-          <View style={styles.metadataFooter}>
-            <View style={styles.metadataItem}>
-              <Text style={styles.metadataLabel}>AUTH TOKEN</Text>
-              <Text style={styles.metadataValuePrimary}>X7-VK-2024</Text>
-            </View>
-            <View style={styles.metadataItem}>
-              <Text style={styles.metadataLabel}>INVENTORY LEVEL</Text>
-              <Text style={styles.metadataValue}>94.2%</Text>
-            </View>
-            <View style={styles.metadataItem}>
-              <Text style={styles.metadataLabel}>SYSTEM UPTIME</Text>
-              <Text style={[styles.metadataValue, { color: COLORS.tertiary }]}>99.98%</Text>
-            </View>
-            <View style={[styles.metadataItem, { alignItems: 'flex-end' }]}>
-              <Text style={styles.metadataLabel}>LAST SYNC</Text>
-              <Text style={styles.metadataValue}>JUST NOW</Text>
-            </View>
-          </View>
-
-          <View style={{ height: 100 }} />
+          <View style={{ height: SPACING.xl }} />
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Bottom Nav */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation?.navigate('Home')}>
-          <MaterialIcons name="precision-manufacturing" size={24} color={COLORS.primary} />
-          <Text style={styles.navTextActive}>INVENTORY</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialIcons name="history" size={24} color="#9ca3af" />
-          <Text style={styles.navText}>HISTORY</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialIcons name="build" size={24} color="#9ca3af" />
-          <Text style={styles.navText}>SUPPORT</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -247,247 +277,148 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
     backgroundColor: COLORS.surfaceContainerLow,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  backButton: {
+    padding: SPACING.xs,
   },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerTitle: {
-    marginLeft: 12,
-    fontSize: 16,
+    marginLeft: SPACING.sm,
+    fontSize: FONT_SIZES.md,
     fontWeight: '700',
     letterSpacing: 1.5,
     color: COLORS.primary,
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.xl,
   },
   titleSection: {
-    marginBottom: 40,
+    marginBottom: SPACING.xl,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.sm,
     fontWeight: '700',
     letterSpacing: 3,
     color: COLORS.primary,
   },
   title: {
-    fontSize: 40,
+    fontSize: FONT_SIZES.display,
     fontWeight: '700',
     letterSpacing: -1,
     color: COLORS.onSurface,
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
-  formContainer: {
-    gap: 24,
-  },
-  visualCard: {
-    height: 300,
+  photoCard: {
     backgroundColor: COLORS.surfaceContainer,
-    borderRadius: 12,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
   },
-  visualImage: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.4,
-  },
-  visualOverlay: {
-    padding: 24,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  visualStatus: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: COLORS.primaryFixedDim,
-    letterSpacing: 3,
-  },
-  visualDescription: {
-    fontSize: 12,
-    color: COLORS.onSurfaceVariant,
-    marginTop: 4,
-  },
-  specsCard: {
-    backgroundColor: COLORS.surfaceContainerLow,
-    padding: 24,
-    borderRadius: 12,
-    gap: 8,
-  },
-  specsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  specsTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
-    letterSpacing: 1,
-  },
-  specRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(86, 67, 52, 0.1)',
-    paddingBottom: 8,
-  },
-  specLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.onSurfaceVariant,
-  },
-  specValue: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.onSurface,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  formContent: {
-    backgroundColor: COLORS.surfaceContainer,
-    borderRadius: 12,
-    padding: 24,
-    gap: 24,
-  },
-  inputGroup: {
-    gap: 8,
-  },
-  inputLabel: {
-    fontSize: 10,
+  photoLabel: {
+    fontSize: FONT_SIZES.xs,
     fontWeight: '700',
     color: COLORS.primary,
     letterSpacing: 2,
+    marginBottom: SPACING.md,
   },
-  inputWrapper: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  input: {
+  photoPlaceholder: {
+    height: 180,
     backgroundColor: COLORS.surfaceContainerLowest,
-    padding: 16,
-    borderRadius: 4,
-    color: COLORS.onSurface,
-    fontSize: 14,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.primaryOverlay,
+    borderStyle: 'solid',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
-  inputIcon: {
-    position: 'absolute',
-    right: 16,
-  },
-  currencyPrefix: {
-    position: 'absolute',
-    left: 16,
+  photoPlaceholderText: {
     color: COLORS.onSurfaceVariant,
-    zIndex: 1,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+  },
+  photoPreviewContainer: {
+    gap: SPACING.md,
+  },
+  photoPreview: {
+    width: '100%',
+    height: 220,
+    borderRadius: RADIUS.md,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  photoActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.sm + 2,
+    borderRadius: RADIUS.sm,
+    gap: SPACING.xs,
+  },
+  photoActionText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.onPrimaryFixed,
+    letterSpacing: 1,
+  },
+  photoRemoveBtn: {
+    backgroundColor: COLORS.errorOverlay,
+  },
+  formContent: {
+    backgroundColor: COLORS.surfaceContainer,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    gap: SPACING.lg,
   },
   actionContainer: {
-    flexDirection: 'column',
-    gap: 16,
-    paddingTop: 16,
+    gap: SPACING.md,
+    paddingTop: SPACING.md,
   },
   saveButton: {
     backgroundColor: COLORS.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 8,
-    gap: 8,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    gap: SPACING.sm,
   },
   saveButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.md,
     fontWeight: '900',
     color: COLORS.onPrimaryFixed,
     letterSpacing: 2,
   },
   cancelButton: {
-    backgroundColor: 'rgba(53, 52, 54, 0.5)',
+    backgroundColor: COLORS.surfaceCancelButton,
     borderWidth: 1,
-    borderColor: 'rgba(164, 140, 122, 0.2)',
+    borderColor: COLORS.surfaceCancelBorder,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 8,
-    gap: 8,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    gap: SPACING.sm,
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.md,
     fontWeight: '900',
     color: COLORS.onSurface,
     letterSpacing: 2,
-  },
-  metadataFooter: {
-    marginTop: 48,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(86, 67, 52, 0.15)',
-    paddingTop: 32,
-    gap: 16,
-  },
-  metadataItem: {
-    width: (width - 48 - 16) / 2,
-    gap: 4,
-  },
-  metadataLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(221, 193, 174, 0.6)',
-  },
-  metadataValue: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.onSurface,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  metadataValuePrimary: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.primaryFixedDim,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(86, 67, 52, 0.15)',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingBottom: 20,
-  },
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-  },
-  navText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#9ca3af',
-    marginTop: 4,
-  },
-  navTextActive: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginTop: 4,
   },
 });
 
