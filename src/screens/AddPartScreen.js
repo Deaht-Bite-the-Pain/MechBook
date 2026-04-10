@@ -12,10 +12,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  Alert,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import partStorage from '../storage/partStorage';
 
 const { width } = Dimensions.get('window');
-import { MaterialIcons } from '@expo/vector-icons';
 
 const COLORS = {
   background: '#131314',
@@ -46,8 +48,39 @@ const AddPartScreen = ({ navigation }) => {
     marca: '',
     noSerie: '',
     precio: '',
-    fecha: '',
+    fechaCambio: '',
   });
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.pieza.trim())       newErrors.pieza       = 'El tipo de pieza es requerido';
+    if (!formData.marca.trim())       newErrors.marca       = 'La marca es requerida';
+    if (!formData.noSerie.trim())     newErrors.noSerie     = 'El número de serie es requerido';
+    if (!formData.precio.trim())      newErrors.precio      = 'El precio es requerido';
+    else if (isNaN(parseFloat(formData.precio))) newErrors.precio = 'El precio debe ser un número';
+    if (!formData.fechaCambio.trim()) newErrors.fechaCambio = 'La fecha es requerida';
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.fechaCambio)) newErrors.fechaCambio = 'Formato inválido. Use YYYY-MM-DD';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) {
+      Alert.alert('Campos incompletos', 'Por favor corrige los errores antes de guardar.');
+      return;
+    }
+    const newPart = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      pieza:       formData.pieza.trim(),
+      marca:       formData.marca.trim(),
+      noSerie:     formData.noSerie.trim(),
+      precio:      parseFloat(formData.precio),
+      fechaCambio: formData.fechaCambio.trim(),
+    };
+    await partStorage.savePart(newPart);
+    navigation.goBack();
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -116,7 +149,7 @@ const AddPartScreen = ({ navigation }) => {
                 <Text style={styles.inputLabel}>PIEZA</Text>
                 <View style={styles.inputWrapper}>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, errors.pieza && styles.inputError]}
                     placeholder="ej. Bujía de Iridio"
                     placeholderTextColor="rgba(221, 193, 174, 0.3)"
                     value={formData.pieza}
@@ -124,30 +157,33 @@ const AddPartScreen = ({ navigation }) => {
                   />
                   <MaterialIcons name="precision-manufacturing" size={20} color={COLORS.primary} style={styles.inputIcon} />
                 </View>
+                {errors.pieza && <Text style={styles.errorText}>{errors.pieza}</Text>}
               </View>
 
               {/* Marca */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>MARCA</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, errors.marca && styles.inputError]}
                   placeholder="ej. Bosch"
                   placeholderTextColor="rgba(221, 193, 174, 0.3)"
                   value={formData.marca}
                   onChangeText={(text) => setFormData({...formData, marca: text})}
                 />
+                {errors.marca && <Text style={styles.errorText}>{errors.marca}</Text>}
               </View>
 
               {/* No. Serie */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>NO. SERIE</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, errors.noSerie && styles.inputError]}
                   placeholder="Número de serie alfanumérico"
                   placeholderTextColor="rgba(221, 193, 174, 0.3)"
                   value={formData.noSerie}
                   onChangeText={(text) => setFormData({...formData, noSerie: text})}
                 />
+                {errors.noSerie && <Text style={styles.errorText}>{errors.noSerie}</Text>}
               </View>
 
               {/* Precio */}
@@ -156,7 +192,7 @@ const AddPartScreen = ({ navigation }) => {
                 <View style={styles.inputWrapper}>
                   <Text style={styles.currencyPrefix}>$</Text>
                   <TextInput
-                    style={[styles.input, { paddingLeft: 30 }]}
+                    style={[styles.input, { paddingLeft: 30 }, errors.precio && styles.inputError]}
                     placeholder="0.00"
                     placeholderTextColor="rgba(221, 193, 174, 0.3)"
                     keyboardType="numeric"
@@ -164,6 +200,7 @@ const AddPartScreen = ({ navigation }) => {
                     onChangeText={(text) => setFormData({...formData, precio: text})}
                   />
                 </View>
+                {errors.precio && <Text style={styles.errorText}>{errors.precio}</Text>}
               </View>
 
               {/* Fecha de Cambio */}
@@ -171,19 +208,20 @@ const AddPartScreen = ({ navigation }) => {
                 <Text style={styles.inputLabel}>FECHA DE CAMBIO</Text>
                 <View style={styles.inputWrapper}>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, errors.fechaCambio && styles.inputError]}
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="rgba(221, 193, 174, 0.3)"
-                    value={formData.fecha}
-                    onChangeText={(text) => setFormData({...formData, fecha: text})}
+                    value={formData.fechaCambio}
+                    onChangeText={(text) => setFormData({...formData, fechaCambio: text})}
                   />
                   <MaterialIcons name="calendar-today" size={18} color="rgba(221, 193, 174, 0.4)" style={styles.inputIcon} />
                 </View>
+                {errors.fechaCambio && <Text style={styles.errorText}>{errors.fechaCambio}</Text>}
               </View>
 
               {/* CTA Actions */}
               <View style={styles.actionContainer}>
-                <TouchableOpacity style={styles.saveButton}>
+                <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
                   <Text style={styles.saveButtonText}>GUARDAR</Text>
                   <MaterialIcons name="check-circle" size={16} color={COLORS.onPrimaryFixed} />
                 </TouchableOpacity>
@@ -389,6 +427,15 @@ const styles = StyleSheet.create({
     left: 16,
     color: COLORS.onSurfaceVariant,
     zIndex: 1,
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    fontSize: 11,
+    color: COLORS.error,
+    marginTop: 4,
   },
   actionContainer: {
     flexDirection: 'column',
