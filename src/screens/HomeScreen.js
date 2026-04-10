@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,6 +10,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import PartDetailModal from '../components/PartDetailModal';
+import partStorage from '../storage/partStorage';
+import { sortPartsByDate, formatDateDisplay } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +42,38 @@ const COLORS = {
 };
 
 const HomeScreen = ({ navigation }) => {
+  const [parts, setParts] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedPart, setSelectedPart] = useState(null);
+
+  const loadParts = useCallback(async () => {
+    const data = await partStorage.loadParts();
+    setParts(sortPartsByDate(data));
+  }, []);
+
+  useEffect(() => {
+    loadParts();
+  }, [loadParts]);
+
+  // Recarga la lista cada vez que la pantalla obtiene foco (ej: al volver de AddPart)
+  useFocusEffect(
+    useCallback(() => {
+      loadParts();
+    }, [loadParts])
+  );
+
+  const handleOpenDetail = (part) => {
+    setSelectedPart(part);
+    setModalVisible(true);
+  };
+
+  const handleDelete = async (id) => {
+    await partStorage.deletePart(id);
+    loadParts();
+  };
+
+  const sortedParts = sortPartsByDate(parts);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.surfaceContainerLow} />
@@ -85,7 +121,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.inventoryTitleContainer}>
             <Text style={styles.inventoryTitle}>Piezas Registradas</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>04 TOTAL</Text>
+              <Text style={styles.badgeText}>{String(sortedParts.length).padStart(2, '0')} TOTAL</Text>
             </View>
           </View>
           <View style={styles.inventoryHeaderActions}>
@@ -100,96 +136,62 @@ const HomeScreen = ({ navigation }) => {
 
         {/* List Items */}
         <View style={styles.listContainer}>
-          {/* Card 1 */}
-          <View style={styles.card}>
-            <View style={styles.cardIndicator} />
-            <View style={styles.cardContent}>
-              <View style={styles.cardIconContainer}>
-                <MaterialIcons name="settings-applications" size={32} color={COLORS.primary} />
+          {sortedParts.map((part) => (
+            <TouchableOpacity
+              key={part.id}
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() => handleOpenDetail(part)}
+            >
+              <View style={styles.cardContent}>
+                <View style={styles.cardIconContainer}>
+                  <MaterialIcons name="build" size={32} color={COLORS.primary} />
+                </View>
+                <View style={styles.cardTextContainer}>
+                  <Text style={styles.cardCode}>NO. SERIE: {part.noSerie}</Text>
+                  <Text style={styles.cardTitle}>Pieza: {part.pieza}</Text>
+                  <Text style={styles.cardDate}>Fecha de Cambio: {formatDateDisplay(part.fechaCambio)}</Text>
+                </View>
               </View>
-              <View style={styles.cardTextContainer}>
-                <Text style={styles.cardCode}>CÓDIGO: AUTO-091</Text>
-                <Text style={styles.cardTitle}>Pieza: Bujía de Iridio</Text>
-                <Text style={styles.cardDate}>Fecha de Cambio: 29/09/2023</Text>
+              <View style={styles.cardFooter}>
+                <View style={styles.statusContainer}>
+                  <Text style={styles.statusLabel}>MARCA</Text>
+                  <Text style={[styles.statusValue, { color: COLORS.tertiary }]}>{part.marca}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDelete(part.id);
+                  }}
+                >
+                  <MaterialIcons name="delete" size={16} color={COLORS.error} />
+                  <Text style={styles.deleteButtonText}>ELIMINAR</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.cardFooter}>
-              <View style={styles.statusContainer}>
-                <Text style={styles.statusLabel}>ESTADO</Text>
-                <Text style={[styles.statusValue, { color: COLORS.tertiary }]}>ÓPTIMO</Text>
-              </View>
-              <TouchableOpacity style={styles.deleteButton}>
-                <MaterialIcons name="delete" size={16} color={COLORS.error} />
-                <Text style={styles.deleteButtonText}>ELIMINAR</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Card 2 */}
-          <View style={styles.card}>
-            <View style={styles.cardIndicator} />
-            <View style={styles.cardContent}>
-              <View style={styles.cardIconContainer}>
-                <MaterialIcons name="opacity" size={32} color={COLORS.primary} />
-              </View>
-              <View style={styles.cardTextContainer}>
-                <Text style={styles.cardCode}>CÓDIGO: AUTO-044</Text>
-                <Text style={styles.cardTitle}>Pieza: Filtro de Aceite</Text>
-                <Text style={styles.cardDate}>Fecha de Cambio: 15/08/2023</Text>
-              </View>
-            </View>
-            <View style={styles.cardFooter}>
-              <View style={styles.statusContainer}>
-                <Text style={styles.statusLabel}>ESTADO</Text>
-                <Text style={[styles.statusValue, { color: COLORS.tertiary }]}>ÓPTIMO</Text>
-              </View>
-              <TouchableOpacity style={styles.deleteButton}>
-                <MaterialIcons name="delete" size={16} color={COLORS.error} />
-                <Text style={styles.deleteButtonText}>ELIMINAR</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Card 3 */}
-          <View style={styles.card}>
-            <View style={styles.cardIndicator} />
-            <View style={styles.cardContent}>
-              <View style={styles.cardIconContainer}>
-                <MaterialIcons name="directions-car" size={32} color={COLORS.primary} />
-              </View>
-              <View style={styles.cardTextContainer}>
-                <Text style={styles.cardCode}>CÓDIGO: AUTO-212</Text>
-                <Text style={styles.cardTitle}>Pieza: Pastillas de Freno</Text>
-                <Text style={styles.cardDate}>Fecha de Cambio: 02/05/2023</Text>
-              </View>
-            </View>
-            <View style={styles.cardFooter}>
-              <View style={styles.statusContainer}>
-                <Text style={styles.statusLabel}>ESTADO</Text>
-                <Text style={[styles.statusValue, { color: COLORS.onErrorContainer }]}>REVISAR</Text>
-              </View>
-              <TouchableOpacity style={styles.deleteButton}>
-                <MaterialIcons name="delete" size={16} color={COLORS.error} />
-                <Text style={styles.deleteButtonText}>ELIMINAR</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Empty State */}
-        <View style={styles.emptyStateContainer}>
-          <View style={styles.emptyStateIconCircle}>
-            <MaterialIcons name="inventory" size={40} color={COLORS.onSurfaceVariant} />
+        {/* Empty State — solo visible cuando no hay piezas */}
+        {sortedParts.length === 0 && (
+          <View style={styles.emptyStateContainer}>
+            <View style={styles.emptyStateIconCircle}>
+              <MaterialIcons name="inventory" size={40} color={COLORS.onSurfaceVariant} />
+            </View>
+            <Text style={styles.emptyStateTitle}>No hay piezas, Agregue una</Text>
+            <Text style={styles.emptyStateDescription}>
+              Tu inventario está vacío. Presiona "Agregar Pieza" para comenzar el seguimiento.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyStateButton}
+              onPress={() => navigation.navigate('AddPart')}
+            >
+              <MaterialIcons name="add" size={16} color={COLORS.primary} />
+              <Text style={styles.emptyStateButtonText}>Registrar primer repuesto</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.emptyStateTitle}>No hay piezas adicionales</Text>
-          <Text style={styles.emptyStateDescription}>
-            Tu inventario de mantenimiento está actualizado. Agregue una nueva pieza para comenzar el seguimiento.
-          </Text>
-          <TouchableOpacity style={styles.emptyStateButton}>
-            <MaterialIcons name="add" size={16} color={COLORS.primary} />
-            <Text style={styles.emptyStateButtonText}>Registrar primer repuesto</Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
         {/* Fleets Summary */}
         <View style={styles.summarySection}>
@@ -233,6 +235,13 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.navText}>SUPPORT</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Part Detail Modal */}
+      <PartDetailModal 
+        visible={modalVisible} 
+        onClose={() => setModalVisible(false)} 
+        part={selectedPart}
+      />
     </SafeAreaView>
   );
 };

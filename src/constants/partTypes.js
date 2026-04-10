@@ -1,0 +1,17 @@
+export const PART_TYPES = [
+  'Bujías',
+  'Filtro de aceite',
+  'Frenos',
+  'Pastillas de freno',
+  'Batería',
+  'Correa de distribución',
+  'Amortiguadores',
+  'Filtro de aire',
+  'Líquido de frenos',
+  'Aceite de motor',
+  'Neumáticos',
+  'Embrague',
+  'Radiador',
+  'Alternador',
+  'Bomba de agua',
+];
